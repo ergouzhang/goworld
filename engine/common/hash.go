@@ -10,8 +10,17 @@ import (
 	"encoding/binary"
 )
 
-// Hash return hash of the given data.
-func Hash(data []byte, seed uint32) uint32 {
+func HashString(s string) uint32 {
+	return Hash([]byte(s))
+}
+
+// Hash returns the hash of the given data
+func Hash(data []byte) uint32 {
+	return HashSeed(data, 0xbc9f1d34)
+}
+
+// HashSeed return hash of the given data, using specified seed
+func HashSeed(data []byte, seed uint32) uint32 {
 	// Similar to murmur hash
 	const (
 		m = uint32(0xc6a4a793)
@@ -25,7 +34,7 @@ func Hash(data []byte, seed uint32) uint32 {
 	for n := len(data) - len(data)%4; i < n; i += 4 {
 		h += binary.LittleEndian.Uint32(data[i:])
 		h *= m
-		h ^= (h >> 16)
+		h ^= h >> 16
 	}
 
 	switch len(data) - i {
@@ -40,7 +49,7 @@ func Hash(data []byte, seed uint32) uint32 {
 	case 1:
 		h += uint32(data[i])
 		h *= m
-		h ^= (h >> r)
+		h ^= h >> r
 	case 0:
 	}
 

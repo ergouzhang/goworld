@@ -3,18 +3,11 @@ package proto
 import (
 	"unsafe"
 
-	"github.com/xiaonanln/goworld/engine/common"
 	"github.com/xiaonanln/goworld/engine/gwlog"
-	"github.com/xiaonanln/goworld/engine/netutil"
 )
 
 // MsgType is the type of message types
 type MsgType uint16
-
-type Message struct {
-	MsgType MsgType
-	Packet  *netutil.Packet
-}
 
 const (
 	// MT_INVALID is the invalid message type
@@ -27,10 +20,8 @@ const (
 	MT_NOTIFY_CREATE_ENTITY
 	// MT_NOTIFY_DESTROY_ENTITY is a message type for destroying entities
 	MT_NOTIFY_DESTROY_ENTITY
-	// MT_SRVDIS_REGISTER is a message type for declaring services
-	MT_SRVDIS_REGISTER
-	// MT_UNDECLARE_SERVICE is a message type for undeclaring services
-	MT_UNDECLARE_SERVICE
+	// MT_KVREG_REGISTER is a message type for declaring services
+	MT_KVREG_REGISTER
 	// MT_CALL_ENTITY_METHOD is a message type for calling entity methods
 	MT_CALL_ENTITY_METHOD
 	// MT_CREATE_ENTITY_SOMEWHERE is a message type for creating entities
@@ -45,8 +36,6 @@ const (
 	MT_CALL_ENTITY_METHOD_FROM_CLIENT
 	// MT_SYNC_POSITION_YAW_FROM_CLIENT is a message type for clients
 	MT_SYNC_POSITION_YAW_FROM_CLIENT
-	// MT_NOTIFY_ALL_GAMES_CONNECTED is a message type to notify all games connected
-	MT_NOTIFY_ALL_GAMES_CONNECTED // NOT USED ANYMORE
 	// MT_NOTIFY_GATE_DISCONNECTED is a message type to notify gate disconnected
 	MT_NOTIFY_GATE_DISCONNECTED
 	// MT_START_FREEZE_GAME is a message type for hot swapping
@@ -124,18 +113,13 @@ const (
 
 // Messages types that is sent directly between Gate & Client
 const (
-	// MT_SET_CLIENT_CLIENTID message is sent to client to set its clientid
-	MT_SET_CLIENT_CLIENTID = 2001 + iota
-	MT_UDP_SYNC_CONN_NOTIFY_CLIENTID
-	MT_UDP_SYNC_CONN_NOTIFY_CLIENTID_ACK
 	// MT_HEARTBEAT_FROM_CLIENT is sent by client to notify the gate server that the client is alive
-	MT_HEARTBEAT_FROM_CLIENT
+	MT_HEARTBEAT_FROM_CLIENT = 2001 + iota
 )
 
 const (
 	// SYNC_INFO_SIZE_PER_ENTITY is the size of sync info per entity
 	SYNC_INFO_SIZE_PER_ENTITY = 16
-	UDP_SYNC_PACKET_SIZE      = common.ENTITYID_LENGTH + SYNC_INFO_SIZE_PER_ENTITY
 )
 
 // Operators for calling filtered clients

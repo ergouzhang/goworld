@@ -2,13 +2,13 @@ package main
 
 import (
 	"fmt"
-
+	"github.com/xiaonanln/netconnutil"
+	"net"
 	"time"
 
 	"github.com/xiaonanln/goworld/engine/common"
 	"github.com/xiaonanln/goworld/engine/config"
 	"github.com/xiaonanln/goworld/engine/consts"
-	"github.com/xiaonanln/goworld/engine/gwioutil"
 	"github.com/xiaonanln/goworld/engine/gwlog"
 	"github.com/xiaonanln/goworld/engine/netutil"
 	"github.com/xiaonanln/goworld/engine/post"
@@ -35,26 +35,24 @@ type ClientProxy struct {
 	ownerEntityID  common.EntityID // owner entity's ID
 }
 
-func newClientProxy(conn netutil.Connection, cfg *config.GateConfig) *ClientProxy {
-	gwc := proto.NewGoWorldConnection(netutil.NewBufferedConnection(conn), cfg.CompressConnection, cfg.CompressFormat)
-	return &ClientProxy{
-		GoWorldConnection: gwc,
-		clientid:          common.GenClientID(), // each client has its unique clientid
-		filterProps:       map[string]string{},
+func newClientProxy(_conn net.Conn, cfg *config.GateConfig) *ClientProxy {
+	_conn = netconnutil.NewNoTempErrorConn(_conn)
+	var conn netutil.Connection = netutil.NetConn{_conn}
+	if cfg.CompressConnection {
+		conn = netconnutil.NewSnappyConn(conn)
 	}
+	conn = netconnutil.NewBufferedConn(conn, consts.BUFFERED_READ_BUFFSIZE, consts.BUFFERED_WRITE_BUFFSIZE)
+	clientProxy := &ClientProxy{
+		clientid:    common.GenClientID(), // each client has its unique clientid
+		filterProps: map[string]string{},
+	}
+	clientProxy.GoWorldConnection = proto.NewGoWorldConnection(conn, clientProxy)
+	return clientProxy
 }
 
 func (cp *ClientProxy) String() string {
 	return fmt.Sprintf("ClientProxy<%s@%s>", cp.clientid, cp.RemoteAddr())
 }
-
-//func (cp *ClientProxy) SendPacket(packet *netutil.Packet) error {
-//	err := cp.GoWorldConnection.SendPacket(packet)
-//	if err != nil {
-//		return err
-//	}
-//	return cp.Flush("ClientProxy")
-//}
 
 func (cp *ClientProxy) serve() {
 	defer func() {
@@ -71,20 +69,8 @@ func (cp *ClientProxy) serve() {
 		}
 	}()
 
-	cp.SetAutoFlush(consts.CLIENT_PROXY_WRITE_FLUSH_INTERVAL)
-	//cp.SendSetClientClientID(cp.cp) // set the cp on the client side
-
-	for {
-		var msgtype proto.MsgType
-		pkt, err := cp.Recv(&msgtype)
-		if pkt != nil {
-			gateService.clientPacketQueue <- clientProxyMessage{cp, proto.Message{msgtype, pkt}}
-		} else if err != nil && !gwioutil.IsTimeoutError(err) {
-			if netutil.IsConnectionError(err) {
-				break
-			} else {
-				panic(err)
-			}
-		}
+	err := cp.RecvChan(gateService.clientPacketQueue)
+	if err != nil {
+		gwlog.Panic(err)
 	}
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/xiaonanln/pktconn"
 	"time"
 
 	"golang.org/x/net/websocket"
@@ -28,17 +29,12 @@ import (
 	"github.com/xtaci/kcp-go"
 )
 
-type clientProxyMessage struct {
-	cp  *ClientProxy
-	msg proto.Message
-}
-
 // GateService implements the gate service logic
 type GateService struct {
 	listenAddr                  string
 	clientProxies               map[common.ClientID]*ClientProxy
-	dispatcherClientPacketQueue chan proto.Message
-	clientPacketQueue           chan clientProxyMessage
+	dispatcherClientPacketQueue chan *pktconn.Packet
+	clientPacketQueue           chan *pktconn.Packet
 	ticker                      <-chan time.Time
 
 	filterTrees             map[string]*_FilterTree
@@ -63,8 +59,8 @@ func newGateService() *GateService {
 	return &GateService{
 		//dispatcherClientPacketQueue: make(chan packetQueueItem, consts.DISPATCHER_CLIENT_PACKET_QUEUE_SIZE),
 		clientProxies:               map[common.ClientID]*ClientProxy{},
-		dispatcherClientPacketQueue: make(chan proto.Message, consts.GATE_SERVICE_PACKET_QUEUE_SIZE),
-		clientPacketQueue:           make(chan clientProxyMessage, consts.GATE_SERVICE_PACKET_QUEUE_SIZE),
+		dispatcherClientPacketQueue: make(chan *pktconn.Packet, consts.GATE_SERVICE_PACKET_QUEUE_SIZE),
+		clientPacketQueue:           make(chan *pktconn.Packet, consts.GATE_SERVICE_PACKET_QUEUE_SIZE),
 		ticker:                      time.Tick(consts.GATE_SERVICE_TICK_INTERVAL),
 		filterTrees:                 map[string]*_FilterTree{},
 		pendingSyncPackets:          pendingSyncPackets,
@@ -171,22 +167,21 @@ func (gs *GateService) handleWebSocketConn(wsConn *websocket.Conn) {
 	gs.handleClientConnection(wsConn, true)
 }
 
-func (gs *GateService) handleClientConnection(netconn net.Conn, isWebSocket bool) {
+func (gs *GateService) handleClientConnection(conn net.Conn, isWebSocket bool) {
 	// this function might run in multiple threads
 	if gs.terminating.Load() {
 		// server terminating, not accepting more connections
-		netconn.Close()
+		conn.Close()
 		return
 	}
 
 	cfg := config.GetGate(args.gateid)
 
 	if cfg.EncryptConnection && !isWebSocket {
-		tlsConn := tls.Server(netconn, gs.tlsConfig)
-		netconn = net.Conn(tlsConn)
+		tlsConn := tls.Server(conn, gs.tlsConfig)
+		conn = net.Conn(tlsConn)
 	}
 
-	conn := netutil.NetConnection{netconn}
 	cp := newClientProxy(conn, cfg)
 	if consts.DEBUG_CLIENTS {
 		gwlog.Debugf("%s.ServeTCPConnection: client %s connected", gs, cp)
@@ -237,9 +232,14 @@ func (gs *GateService) onClientProxyClose(cp *ClientProxy) {
 	}
 }
 
-// HandleDispatcherClientPacket handles packets received by dispatcher client
-func (gs *GateService) handleClientProxyPacket(cp *ClientProxy, msgtype proto.MsgType, pkt *netutil.Packet) {
+// GetDispatcherClientPacketQueue handles packets received by dispatcher client
+func (gs *GateService) handleClientProxyPacket(_pkt *pktconn.Packet) {
+	pkt := (*netutil.Packet)(_pkt)
+	cp := pkt.Src.Tag.(*ClientProxy)
 	cp.heartbeatTime = time.Now()
+
+	msgtype := proto.MsgType(pkt.ReadUint16())
+
 	switch msgtype {
 	case proto.MT_SYNC_POSITION_YAW_FROM_CLIENT:
 		gs.handleSyncPositionYawFromClient(pkt)
@@ -255,7 +255,10 @@ func (gs *GateService) handleClientProxyPacket(cp *ClientProxy, msgtype proto.Ms
 
 }
 
-func (gs *GateService) handleDispatcherClientPacket(msgtype proto.MsgType, packet *netutil.Packet) {
+func (gs *GateService) handleDispatcherClientPacket(_pkt *pktconn.Packet) {
+	packet := (*netutil.Packet)(_pkt)
+	msgtype := proto.MsgType(packet.ReadUint16())
+
 	if consts.DEBUG_PACKETS {
 		gwlog.Debugf("%s.handleDispatcherClientPacket: msgtype=%v, packet(%d)=%v", gs, msgtype, packet.GetPayloadLen(), packet.Payload())
 	}
@@ -365,7 +368,6 @@ func (gs *GateService) handleSyncPositionYawOnClients(packet *netutil.Packet) {
 			packet := netutil.NewPacket()
 			packet.AppendUint16(proto.MT_SYNC_POSITION_YAW_ON_CLIENTS)
 			packet.AppendBytes(data)
-			packet.SetNotCompress() // too many these packets, giveup compress to save time
 			clientproxy.SendPacket(packet)
 			packet.Release()
 		}
@@ -429,16 +431,16 @@ func (gs *GateService) tryFlushPendingSyncPackets() {
 func (gs *GateService) mainRoutine() {
 	for {
 		select {
-		case item := <-gs.clientPacketQueue:
+		case pkt := <-gs.clientPacketQueue:
 			op := opmon.StartOperation("GateServiceHandlePacket")
-			gs.handleClientProxyPacket(item.cp, item.msg.MsgType, item.msg.Packet)
+			gs.handleClientProxyPacket(pkt)
 			op.Finish(time.Millisecond * 100)
-			item.msg.Packet.Release()
-		case item := <-gs.dispatcherClientPacketQueue:
+			pkt.Release()
+		case pkt := <-gs.dispatcherClientPacketQueue:
 			op := opmon.StartOperation("GateServiceHandlePacket")
-			gs.handleDispatcherClientPacket(item.MsgType, item.Packet)
+			gs.handleDispatcherClientPacket(pkt)
 			op.Finish(time.Millisecond * 100)
-			item.Packet.Release()
+			pkt.Release()
 			break
 		case <-gs.ticker:
 			gs.tryFlushPendingSyncPackets()

@@ -11,7 +11,6 @@ import (
 	"github.com/xiaonanln/goworld/engine/config"
 	"github.com/xiaonanln/goworld/engine/gwlog"
 	"github.com/xiaonanln/goworld/engine/kvdb/backend/kvdb_mongodb"
-	"github.com/xiaonanln/goworld/engine/kvdb/backend/kvdbmysql"
 	"github.com/xiaonanln/goworld/engine/kvdb/backend/kvdbredis"
 	"github.com/xiaonanln/goworld/engine/kvdb/backend/kvdbrediscluster"
 	"github.com/xiaonanln/goworld/engine/kvdb/types"
@@ -60,7 +59,7 @@ func assureKVDBEngineReady() (err error) {
 	if kvdbCfg.Type == "mongodb" {
 		kvdbEngine, err = kvdbmongo.OpenMongoKVDB(kvdbCfg.Url, kvdbCfg.DB, kvdbCfg.Collection)
 	} else if kvdbCfg.Type == "redis" {
-		var dbindex int = -1
+		var dbindex = -1
 		if kvdbCfg.DB != "" {
 			dbindex, err = strconv.Atoi(kvdbCfg.DB)
 			if err != nil {
@@ -70,12 +69,6 @@ func assureKVDBEngineReady() (err error) {
 		kvdbEngine, err = kvdbredis.OpenRedisKVDB(kvdbCfg.Url, dbindex)
 	} else if kvdbCfg.Type == "redis_cluster" {
 		kvdbEngine, err = kvdbrediscluster.OpenRedisKVDB(kvdbCfg.StartNodes.ToList())
-	} else if kvdbCfg.Type == "sql" {
-		if kvdbCfg.Driver == "mysql" {
-			kvdbEngine, err = kvdbmysql.OpenMySQLKVDB(kvdbCfg.Url)
-		} else {
-			gwlog.Fatalf("KVDB mysql driver %s is unknown", kvdbCfg.Driver)
-		}
 	} else {
 		gwlog.Fatalf("KVDB type %s is not implemented", kvdbCfg.Type)
 	}

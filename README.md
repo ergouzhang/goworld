@@ -5,9 +5,6 @@ _**Scalable Distributed Game Server Engine with Hot Reload in Golang**_
 [![GoDoc](https://godoc.org/github.com/xiaonanln/goworld?status.png)](https://godoc.org/github.com/xiaonanln/goworld) 
 [![Build Status](https://api.travis-ci.org/xiaonanln/goworld.svg?branch=master)](https://travis-ci.org/xiaonanln/goworld) [![Go Report Card](https://goreportcard.com/badge/github.com/xiaonanln/goworld)](https://goreportcard.com/report/github.com/xiaonanln/goworld) [![codecov](https://codecov.io/gh/xiaonanln/goworld/branch/master/graph/badge.svg)](https://codecov.io/gh/xiaonanln/goworld) 
 [![ApacheLicense](https://img.shields.io/badge/license-APACHE%20License-blue.svg)](https://raw.githubusercontent.com/xiaonanln/goworld/master/LICENSE)
-[![Join the chat at https://gitter.im/goworldgs/Lobby](https://badges.gitter.im/goworldgs/Lobby.svg)](https://gitter.im/goworldgs/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
-
-
 
   * [Features](#features)
   * [Architecture](#architecture)
@@ -16,7 +13,7 @@ _**Scalable Distributed Game Server Engine with Hot Reload in Golang**_
   * [Manage GoWorld Servers](#manage-goworld-servers)
   * [Demos](#demos)
     * [Chatroom Demo](#chatroom-demo)
-    * [Unity Demo](#unity-demo): [GoWorldUnityDemo.zip](http://goworldgs.com/goworld_files/GoWorldUnityDemo.zip) 
+    * [Unity Demo](#unity-demo): [GoWorldUnityDemo.zip](https://drive.google.com/file/d/1A1CJCVWFQWa-iMuAoAdHZ4JoXTtU5Q7z/view?usp=sharing) 
 ---------------------------------------
 #### 中文资料 
 > [中文文档](https://godoc.org/github.com/xiaonanln/goworld/cn)  
@@ -49,7 +46,7 @@ _**Scalable Distributed Game Server Engine with Hot Reload in Golang**_
 * **Traffic Compression & Encryption**: traffic between clients and servers can be compressed and encrypted
 
 ## Architecture
-![GoWorld Architecture](http://goworldgs.com/public/img/goworld_arch.png "GoWorld Architecture")
+![GoWorld Architecture](https://docs.google.com/drawings/d/e/2PACX-1vS20sn1rD-x23P6PpBV-C4Uy5BI6vry4TjKV9pBPtmoghlkH_aP24Ip4usyUciPRC6tpvsJX4Gufgvj/pub?w=960&h=720 "GoWorld Architecture")
 
 ## Introduction
 GoWorld server adopts an entity framework, in which entities represent all players, monsters, NPCs.
@@ -67,24 +64,10 @@ back to work but with the latest executable image. This feature enables updating
  transparently without significant interference of online players. 
 
 ## Installing GoWorld
-GoWorld requries Go 1.10.x to install.
+GoWorld requries Go 1.11+ to install.
 ```bash
-go get -d github.com/xiaonanln/goworld
-go get -u github.com/golang/dep/cmd/dep
-cd $GOPATH/src/github.com/xiaonanln/goworld
-dep ensure
-go get ./cmd/...
-```
-**GoWorld uses [Dep](https://github.com/golang/dep) to manage packages.** 
-
-**For Chinese only:** 
-中国的朋友可能会碰到网络问题，那么您可以通过点击下载[vendor.tar.gz](http://goworldgs.com/goworld_files/vendor.tar.gz)，并将其解压到goworld根目录下。
-
-Or using [Docker](https://www.docker.com/community-edition):
-```bash
-# debian-jessie + golang + goworld + mongodb 3.4 
-docker run -it xiaonanln/goworld-dev
-```
+go get github.com/xiaonanln/goworld/cmd/...
+``` 
 
 ## Manage GoWorld Servers
 Use command `goworld` to build, start, stop and reload game servers. 
@@ -144,7 +127,7 @@ goworld start examples/chatroom_demo
 
 Chatroom demo client implements the client-server protocol in Javascript.  
 The client for chatroom demo is hosted at [github.com/xiaonanln/goworld-chatroom-demo-client](https://github.com/xiaonanln/goworld-chatroom-demo-client).
-The project was created and built in [Cocos Creater 1.5](http://www.cocos2d-x.org/). A running server and client demo can also be found at [http://goworldgs.com/chatclient/](http://goworldgs.com/chatclient/).
+The project was created and built in [Cocos Creater 1.5](http://www.cocos2d-x.org/). 
 
 ### Unity Demo
 Unity Demo is a simple multiple player monster shooting game to show how spaces and entities of GoWorld
@@ -176,5 +159,5 @@ Unity demo client implements the client-server protocol in C#.
 The client for unity demo is hosted at [https://github.com/xiaonanln/goworld-unity-demo](https://github.com/xiaonanln/goworld-unity-demo).
 The project was created and built in [Unity 2017.1](https://unity3d.com/). 
 
-You can try the demo by downloading [GoWorldUnityDemo.zip](http://goworldgs.com/goworld_files/GoWorldUnityDemo.zip). 
+You can try the demo by downloading [GoWorldUnityDemo.zip](https://drive.google.com/file/d/1A1CJCVWFQWa-iMuAoAdHZ4JoXTtU5Q7z/view?usp=sharing). 
 The demo connects to a goworld server on Huawei Cloud instance.

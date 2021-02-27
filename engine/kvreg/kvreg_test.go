@@ -1,4 +1,4 @@
-package srvdis
+package kvreg
 
 import (
 	"testing"

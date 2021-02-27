@@ -2,6 +2,7 @@ package game
 
 import (
 	"fmt"
+	"github.com/xiaonanln/pktconn"
 
 	"time"
 
@@ -20,11 +21,11 @@ import (
 	"github.com/xiaonanln/goworld/engine/gwutils"
 	"github.com/xiaonanln/goworld/engine/gwvar"
 	"github.com/xiaonanln/goworld/engine/kvdb"
+	"github.com/xiaonanln/goworld/engine/kvreg"
 	"github.com/xiaonanln/goworld/engine/netutil"
 	"github.com/xiaonanln/goworld/engine/post"
 	"github.com/xiaonanln/goworld/engine/proto"
 	"github.com/xiaonanln/goworld/engine/service"
-	"github.com/xiaonanln/goworld/engine/srvdis"
 )
 
 const (
@@ -41,7 +42,7 @@ type GameService struct {
 	id     uint16
 	//registeredServices map[string]common.EntityIDSet
 
-	packetQueue                    chan proto.Message
+	packetQueue                    chan *pktconn.Packet
 	runState                       xnsyncutil.AtomicInt
 	nextCollectEntitySyncInfosTime time.Time
 	dispatcherStartFreezeAcks      []bool
@@ -56,7 +57,7 @@ func newGameService(gameid uint16) *GameService {
 	return &GameService{
 		id: gameid,
 		//registeredServices: map[string]common.EntityIDSet{},
-		packetQueue: make(chan proto.Message, consts.GAME_SERVICE_PACKET_QUEUE_SIZE),
+		packetQueue: make(chan *pktconn.Packet, consts.GAME_SERVICE_PACKET_QUEUE_SIZE),
 		ticker:      time.Tick(consts.GAME_SERVICE_TICK_INTERVAL),
 		onlineGames: common.Uint16Set{},
 		//terminated:         xnsyncutil.NewOneTimeCond(),
@@ -88,8 +89,10 @@ func (gs *GameService) serveRoutine() {
 	for {
 		isTick := false
 		select {
-		case item := <-gs.packetQueue:
-			msgtype, pkt := item.MsgType, item.Packet
+		case _pkt := <-gs.packetQueue:
+			pkt := (*netutil.Packet)(_pkt)
+			msgtype := proto.MsgType(pkt.ReadUint16())
+
 			switch msgtype {
 			case proto.MT_SYNC_POSITION_YAW_FROM_CLIENT:
 				gs.HandleSyncPositionYawFromClient(pkt)
@@ -136,14 +139,8 @@ func (gs *GameService) serveRoutine() {
 				method := pkt.ReadVarStr()
 				args := pkt.ReadArgs()
 				gs.HandleCallNilSpaces(method, args)
-			case proto.MT_SRVDIS_REGISTER:
-				gs.HandleSrvdisRegister(pkt)
-			//case proto.MT_UNDECLARE_SERVICE:
-			//	eid := pkt.ReadEntityID()
-			//	serviceName := pkt.ReadVarStr()
-			//	gs.HandleUndeclareService(eid, serviceName)
-			//case proto.MT_NOTIFY_ALL_GAMES_CONNECTED:
-			//	gs.handleNotifyAllGamesConnected()
+			case proto.MT_KVREG_REGISTER:
+				gs.HandleKvregRegister(pkt)
 			case proto.MT_NOTIFY_GATE_DISCONNECTED:
 				gateid := pkt.ReadUint16()
 				gs.HandleGateDisconnected(gateid)
@@ -289,14 +286,14 @@ func (gs *GameService) HandleLoadEntitySomewhere(typeName string, entityID commo
 	entity.OnLoadEntitySomewhere(typeName, entityID)
 }
 
-func (gs *GameService) HandleSrvdisRegister(pkt *netutil.Packet) {
+func (gs *GameService) HandleKvregRegister(pkt *netutil.Packet) {
 	// tell the entity that it is registered successfully
 	srvid := pkt.ReadVarStr()
 	srvinfo := pkt.ReadVarStr()
 	force := pkt.ReadBool() // force is not useful here
-	gwlog.Infof("%s srvdis register: %s => %s, force %v", gs, srvid, srvinfo, force)
+	gwlog.Infof("%s kvreg register: %s => %s, force %v", gs, srvid, srvinfo, force)
 
-	srvdis.WatchSrvdisRegister(srvid, srvinfo)
+	kvreg.WatchKvregRegister(srvid, srvinfo)
 }
 
 func (gs *GameService) HandleGateDisconnected(gateid uint16) {
@@ -368,14 +365,14 @@ func (gs *GameService) handleSetGameIDAck(pkt *netutil.Packet) {
 		}
 	}
 
-	srvdisMap := pkt.ReadMapStringString()
-	srvdis.ClearByDispatcher(dispid)
-	for srvid, srvinfo := range srvdisMap {
-		srvdis.WatchSrvdisRegister(srvid, srvinfo)
+	kvregMap := pkt.ReadMapStringString()
+	kvreg.ClearByDispatcher(dispid)
+	for srvid, srvinfo := range kvregMap {
+		kvreg.WatchKvregRegister(srvid, srvinfo)
 	}
 
-	gwlog.Infof("%s: set game ID ack received, deployment ready: %v, %d online games, reject entities: %d, srvdis map: %+v",
-		gs, isDeploymentReady, len(gs.onlineGames), rejectEntitiesNum, srvdisMap)
+	gwlog.Infof("%s: set game ID ack received, deployment ready: %v, %d online games, reject entities: %d, kvreg map: %+v",
+		gs, isDeploymentReady, len(gs.onlineGames), rejectEntitiesNum, kvregMap)
 	if isDeploymentReady {
 		// all games are connected
 		gs.onDeploymentReady()

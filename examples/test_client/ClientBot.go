@@ -1,6 +1,8 @@
 package main
 
 import (
+	"github.com/xiaonanln/netconnutil"
+	"github.com/xiaonanln/pktconn"
 	"net"
 	"sync"
 
@@ -18,7 +20,6 @@ import (
 	"github.com/xiaonanln/goworld/engine/config"
 	"github.com/xiaonanln/goworld/engine/consts"
 	"github.com/xiaonanln/goworld/engine/entity"
-	"github.com/xiaonanln/goworld/engine/gwioutil"
 	"github.com/xiaonanln/goworld/engine/gwlog"
 	"github.com/xiaonanln/goworld/engine/netutil"
 	"github.com/xiaonanln/goworld/engine/post"
@@ -53,7 +54,7 @@ type ClientBot struct {
 	useKCP             bool
 	useWebSocket       bool
 	noEntitySync       bool
-	packetQueue        chan proto.Message
+	packetQueue        chan *pktconn.Packet
 }
 
 func newClientBot(id int, useWebSocket bool, useKCP bool, noEntitySync bool, waiter *sync.WaitGroup, waitAllConnected *sync.WaitGroup) *ClientBot {
@@ -65,7 +66,7 @@ func newClientBot(id int, useWebSocket bool, useKCP bool, noEntitySync bool, wai
 		useKCP:           useKCP,
 		useWebSocket:     useWebSocket,
 		noEntitySync:     noEntitySync,
-		packetQueue:      make(chan proto.Message),
+		packetQueue:      make(chan *pktconn.Packet),
 	}
 }
 
@@ -101,7 +102,12 @@ func (bot *ClientBot) run() {
 	if cfg.EncryptConnection && !bot.useWebSocket {
 		netconn = tls.Client(netconn, tlsConfig)
 	}
-	bot.conn = proto.NewGoWorldConnection(netutil.NewBufferedConnection(netutil.NetConnection{netconn}), cfg.CompressConnection, cfg.CompressFormat)
+	var conn netutil.Connection = netutil.NetConn{netconnutil.NewNoTempErrorConn(netconn)}
+	if cfg.CompressConnection {
+		conn = netconnutil.NewSnappyConn(conn)
+	}
+	conn = netconnutil.NewBufferedConn(conn, consts.BUFFERED_READ_BUFFSIZE, consts.BUFFERED_WRITE_BUFFSIZE)
+	bot.conn = proto.NewGoWorldConnection(conn, nil)
 	defer bot.conn.Close()
 
 	if bot.useKCP {
@@ -187,29 +193,18 @@ func (bot *ClientBot) connectServerByWebsocket(cfg *config.GateConfig) (net.Conn
 }
 
 func (bot *ClientBot) recvLoop() {
-	var msgtype proto.MsgType
-
-	for {
-		pkt, err := bot.conn.Recv(&msgtype)
-		if pkt != nil {
-			//fmt.Fprintf(os.Stderr, "P")
-			bot.packetQueue <- proto.Message{msgtype, pkt}
-		} else if err != nil && !gwioutil.IsTimeoutError(err) {
-			// bad error
-			Errorf("%s: client recv packet failed: %v", bot, err)
-			break
-		}
-	}
+	err := bot.conn.RecvChan(bot.packetQueue)
+	gwlog.Error(err)
 }
 
 func (bot *ClientBot) loop() {
 	ticker := time.Tick(time.Millisecond * 100)
 	for {
 		select {
-		case item := <-bot.packetQueue:
-			//fmt.Fprintf(os.Stderr, "p")
-			bot.handlePacket(item.MsgType, item.Packet)
-			item.Packet.Release()
+		case _pkt := <-bot.packetQueue:
+			pkt := (*netutil.Packet)(_pkt)
+			bot.handlePacket(pkt)
+			pkt.Release()
 			break
 		case <-ticker:
 			//fmt.Fprintf(os.Stderr, "|")
@@ -232,14 +227,13 @@ func (bot *ClientBot) loop() {
 				}
 
 			}
-			bot.conn.Flush("ClientBot")
 			post.Tick()
 			break
 		}
 	}
 }
 
-func (bot *ClientBot) handlePacket(msgtype proto.MsgType, packet *netutil.Packet) {
+func (bot *ClientBot) handlePacket(packet *netutil.Packet) {
 	defer func() {
 		err := recover()
 		if err != nil {
@@ -250,7 +244,7 @@ func (bot *ClientBot) handlePacket(msgtype proto.MsgType, packet *netutil.Packet
 	bot.Lock()
 	defer bot.Unlock()
 
-	//gwlog.Infof("client handle packet: msgtype=%v, payload=%v", msgtype, packet.Payload())
+	msgtype := packet.ReadUint16()
 
 	if msgtype >= proto.MT_REDIRECT_TO_GATEPROXY_MSG_TYPE_START && msgtype <= proto.MT_REDIRECT_TO_GATEPROXY_MSG_TYPE_STOP {
 		_ = packet.ReadUint16()
@@ -366,9 +360,6 @@ func (bot *ClientBot) handlePacket(msgtype proto.MsgType, packet *netutil.Packet
 			bot.updateEntityPosition(entityID, entity.Vector3{x, y, z})
 			bot.updateEntityYaw(entityID, yaw)
 		}
-		//} else if msgtype == proto.MT_SET_CLIENT_CLIENTID {
-		//	clientid := packet.ReadClientID()
-		//	bot.setClientID(clientid)
 	} else {
 		gwlog.Panicf("unknown msgtype: %v", msgtype)
 	}

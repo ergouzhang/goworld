@@ -15,10 +15,6 @@ const (
 	// BUFFERED_WRITE_BUFFSIZE is the write buffer size for BufferedWriteConnection
 	BUFFERED_WRITE_BUFFSIZE = 16384
 
-	// For Packets Send & Recv
-	// PACKET_PAYLOAD_LEN_COMPRESS_THRESHOLD is the minimal packet payload length that should be compressed
-	PACKET_PAYLOAD_LEN_COMPRESS_THRESHOLD = 512
-
 	// For Dispatcher
 	// DISPATCHER_GC_PERCENT is the GC percent for dispatcher
 	DISPATCHER_GC_PERCENT = 1000
@@ -34,10 +30,6 @@ const (
 	DISPATCHER_SERVICE_PACKET_QUEUE_SIZE = 10000
 	// DISPATCHER_SERVICE_TICK_INTERVAL is the tick interval for dispatcher service's main routine.
 	DISPATCHER_SERVICE_TICK_INTERVAL = time.Millisecond * 5 // server tick interval => affect timer resolution
-	// DISPATCHER_CLIENT_PROXY_WRITE_FLUSH_INTERVAL is the flush interval for client proxy. Smaller interval costs more CPU but dispatches patckets sooner
-	DISPATCHER_CLIENT_PROXY_WRITE_FLUSH_INTERVAL = 5 * time.Millisecond
-	// DISPATCHER_CLIENT_FLUSH_INTERVAL is the flush interval for dispatcher clients (game -> dispatcher)
-	DISPATCHER_CLIENT_FLUSH_INTERVAL = 5 * time.Millisecond
 
 	// For Game Service
 	// GAME_SERVICE_PACKET_QUEUE_SIZE is the max packet queue length for game service
@@ -59,13 +51,8 @@ const (
 	CLIENT_PROXY_WRITE_BUFFER_SIZE = 1024 * 1024
 	// CLIENT_PROXY_READ_BUFFER_SIZE is the read buffer size for gates' client proxies
 	CLIENT_PROXY_READ_BUFFER_SIZE = 1024 * 1024
-	// COMPRESS_WRITER_POOL_SIZE is number of write compressors in the pool for gate
-	//COMPRESS_WRITER_POOL_SIZE = 100
 	// CLIENT_PROXY_SET_TCP_NO_DELAY = true sets client proxies to TcpNoDelay
-	CLIENT_PROXY_SET_TCP_NO_DELAY     = true
-	CLIENT_PROXY_WRITE_FLUSH_INTERVAL = time.Millisecond * 5
-
-	//SAVE_INTERVAL      = time.Minute * 5 // Save interval of entities
+	CLIENT_PROXY_SET_TCP_NO_DELAY = true
 
 	// ENTER_SPACE_REQUEST_TIMEOUT is the timeout for enter space request
 	ENTER_SPACE_REQUEST_TIMEOUT = DISPATCHER_MIGRATE_TIMEOUT + time.Minute // enter space should finish in limited seconds
@@ -79,14 +66,6 @@ const (
 	// For Operation Monitor
 	// OPMON_DUMP_INTERVAL is the interval to print opmon infos to output
 	OPMON_DUMP_INTERVAL = 0
-
-	// For Snappy Compress
-	// MIN_DATA_SIZE_TO_COMPRESS is the minimal data size to compress
-	MIN_DATA_SIZE_TO_COMPRESS = 512
-
-	// For UDP Connections between Gates and Clients
-	// UDP_MAX_PACKET_PAYLOAD_SIZE is the max packet payload size of UDP packets. Since UDP are only used for sync, this value can be very small
-	UDP_MAX_PACKET_PAYLOAD_SIZE = 128 // try to make sure that this value is smaller or equal to _MIN_PAYLOAD_CAP, so that no buffer needs to be allocated
 )
 
 // Debug Options
@@ -101,8 +80,6 @@ const (
 	DEBUG_CLIENTS = false
 	// DEBUG_MIGRATE prints migration debug logs
 	DEBUG_MIGRATE = false
-	// DEBUG_PACKET_ALLOC prints  packet allocation debug logs
-	DEBUG_PACKET_ALLOC = false
 	// DEBUG_FILTER_PROP prints filter props debug logs
 	DEBUG_FILTER_PROP = false
 )
